@@ -66,12 +66,12 @@ internal sealed class TrayContext : ApplicationContext
             if (!Policy.ShouldNotify(config, status, state, now)) return;
             var outlook = status!.Outlook!;
             var first = TimeZoneInfo.ConvertTime(outlook.FirstIntervalEnd!.Value.AddHours(-1), config.Zone);
-            var text = $"{config.Name} 今天可能有雨，出门前考虑带伞。\n\n"
+            var text = $"{config.PlaceLabel} 今天可能有雨，出门前考虑带伞。\n\n"
                 + $"预计从 {first:HH:mm} 左右有降水风险\n"
                 + $"剩余时段最高降水概率：{outlook.MaxProbability}%\n"
                 + $"最大小时降水量：{outlook.MaxPrecipitation:g} mm\n\n"
                 + "数据：Open-Meteo（包含雨、阵雨和雪）";
-            var url = "https://www.google.com/search?q=" + Uri.EscapeDataString(config.Name + " 今日 天气");
+            var url = "https://www.google.com/search?q=" + Uri.EscapeDataString(config.PlaceLabel + " 今日 天气");
             showingReminder = true;
             try
             {

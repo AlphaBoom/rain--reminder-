@@ -139,6 +139,41 @@ Test("built-in JSON parser reads forecast and geocoding API shapes", () => {
     var result = client.ForecastAsync(config, CancellationToken.None).GetAwaiter().GetResult();
     Assert(result.Hourly!.Time!.Length == 2 && result.Hourly.Probability![0] == 40 && result.Hourly.Precipitation![1] is null);
 });
+Test("single digit and full width time inputs work in Japanese locale", () => {
+    var culture = System.Globalization.CultureInfo.CurrentCulture;
+    try
+    {
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("ja-JP");
+        Assert((config with { MorningStart = "6:00", MorningEnd = "10：00" }).Validate().Start == TimeSpan.FromHours(6));
+    }
+    finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+});
+Test("blank and common holiday date formats normalize", () => {
+    Assert(WeatherConfig.ParseExcludedDates(" , ， \n ").Length == 0);
+    Assert(WeatherConfig.ParseExcludedDates("2026/11/3，2026-11-23;2026.11.03").SequenceEqual(new[] { "2026-11-03", "2026-11-23" }));
+});
+Test("invalid input identifies the field and value", () => {
+    try { (config with { MorningStart = "25:00" }).Validate(); throw new Exception("Expected invalid time"); }
+    catch (ArgumentException ex) { Assert(ex.Message.Contains("开始时间")); }
+    try { WeatherConfig.ParseExcludedDates("2026-02-30"); throw new Exception("Expected invalid date"); }
+    catch (ArgumentException ex) { Assert(ex.Message.Contains("2026-02-30")); }
+});
+Test("Japanese kanji locality search uses Japanese data and preserves prefecture", () => {
+    using var http = new HttpClient(new FixtureHandler());
+    var matches = new WeatherClient(http).SearchAsync("仙台市", CancellationToken.None, "JP").GetAwaiter().GetResult();
+    Assert(matches.Length == 1 && matches[0].Name == "仙台市" && matches[0].Region == "宮城県" && matches[0].TimeZone == "Asia/Tokyo");
+});
+Test("selected locality details survive reopening settings", () => {
+    var path = Path.Combine(Path.GetTempPath(), "rain-place-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        Store.Write(path, config with { Region = "宮城県", Country = "日本" });
+        var copy = Store.Read<WeatherConfig>(path)!;
+        Assert(copy.Region == "宮城県" && copy.PlaceLabel == "仙台 · 宮城県 · 日本");
+        Assert(new Location { Name = "仙台" }.ToString() == "仙台");
+    }
+    finally { File.Delete(path); }
+});
 Console.WriteLine($"{count} tests passed.");
 if (args.Contains("--live"))
 {
@@ -155,7 +190,9 @@ sealed class FixtureHandler : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
     {
-        var json = request.RequestUri!.Host.StartsWith("geocoding", StringComparison.Ordinal)
+        var json = request.RequestUri!.Host == "msearch.gsi.go.jp"
+            ? "[{\"geometry\":{\"coordinates\":[140.869507,38.268162]},\"properties\":{\"title\":\"宮城県仙台市\"}}]"
+            : request.RequestUri.Host.StartsWith("geocoding", StringComparison.Ordinal)
             ? "{\"results\":[{\"name\":\"Sendai\",\"latitude\":38.27,\"longitude\":140.87,\"timezone\":\"Asia/Tokyo\",\"country\":\"Japan\",\"admin1\":\"Miyagi\"}]}"
             : "{\"hourly\":{\"time\":[1792454400,1792458000],\"precipitation_probability\":[40,null],\"precipitation\":[0.1,null]}}";
         return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(json) });

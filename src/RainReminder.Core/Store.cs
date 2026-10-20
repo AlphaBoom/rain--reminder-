@@ -22,7 +22,8 @@ public static class Store
     {
         WeatherConfig c => Map("name", c.Name, "latitude", c.Latitude, "longitude", c.Longitude, "timeZone", c.TimeZone,
             "morningStart", c.MorningStart, "morningEnd", c.MorningEnd, "probabilityThreshold", c.ProbabilityThreshold,
-            "precipitationThreshold", c.PrecipitationThreshold, "excludedDates", c.ExcludedDates, "showTrayIcon", c.ShowTrayIcon),
+            "precipitationThreshold", c.PrecipitationThreshold, "excludedDates", c.ExcludedDates, "showTrayIcon", c.ShowTrayIcon,
+            "region", c.Region, "country", c.Country),
         Outlook o => Map("wet", o.Wet, "firstIntervalEnd", o.FirstIntervalEnd?.ToString("O"), "maxProbability", o.MaxProbability, "maxPrecipitation", o.MaxPrecipitation),
         ServiceStatus s => Map("checkedAt", s.CheckedAt.ToString("O"), "configId", s.ConfigId, "localDate", s.LocalDate,
             "outlook", s.Outlook is null ? null : ToJson(s.Outlook), "error", s.Error, "isHoliday", s.IsHoliday),
@@ -32,6 +33,7 @@ public static class Store
     };
     public static string Serialize<T>(T value) => new JavaScriptSerializer().Serialize(ToJson(value!));
     public static Dictionary<string, object> ParseObject(string json) => new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
+    public static object? ParseJson(string json) => new JavaScriptSerializer().DeserializeObject(json);
     public static object? Value(IDictionary<string, object> map, string key) => map.TryGetValue(key, out var value) ? value : null;
     public static string Text(IDictionary<string, object> map, string key, string fallback = "") => Value(map, key) as string ?? fallback;
     public static double Number(IDictionary<string, object> map, string key, double fallback = 0) => Value(map, key) is { } value ? Convert.ToDouble(value, CultureInfo.InvariantCulture) : fallback;
@@ -58,7 +60,8 @@ public static class Store
                 TimeZone = Text(d, "timeZone", "Asia/Tokyo"), MorningStart = Text(d, "morningStart", "06:00"), MorningEnd = Text(d, "morningEnd", "10:00"),
                 ProbabilityThreshold = (int)Number(d, "probabilityThreshold", 40), PrecipitationThreshold = Number(d, "precipitationThreshold", 0.1),
                 ExcludedDates = ArrayValue(Value(d, "excludedDates")).Select(x => Convert.ToString(x, CultureInfo.InvariantCulture) ?? "").ToArray(),
-                ShowTrayIcon = Flag(d, "showTrayIcon")
+                ShowTrayIcon = Flag(d, "showTrayIcon"),
+                Region = Text(d, "region"), Country = Text(d, "country")
             };
         else if (typeof(T) == typeof(ServiceStatus))
         {

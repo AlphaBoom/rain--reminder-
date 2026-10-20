@@ -11,6 +11,7 @@ internal static class Program
         {
             using var settings = new SettingsForm();
             _ = settings.Handle;
+            settings.VerifySettingsRoundTrip();
             using var reminder = new ReminderForm("测试提醒", "今天可能有雨。");
             _ = reminder.Handle;
             return;

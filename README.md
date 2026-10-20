@@ -17,7 +17,8 @@ Windows 11 上常驻的 C#/.NET Framework 4.8 应用。在工作日早餐时段�
 
 1. 下载 Windows 构建产物 `rain-reminder-win-x64.zip` 并完整解压。
 2. 双击 `scripts/Install.cmd`，接受 Windows 管理员权限提示以注册系统服务。
-3. 在首次设置窗口搜索地点、确认时段并保存。之后关闭设置即可。
+3. 在首次设置窗口输入城市名（如仙台市、東京或 Sendai），选择地点、确认时段并保存。默认只搜索日本，取消“仅日本”可搜索其他国家。
+4. 时间使用选择控件；额外休假可留空，或填写 `2026-11-03` / `2026/11/3`，多个日期支持中英文逗号。之后关闭设置即可。
 
 重新设置：开始菜单搜索 **Rain Reminder**。即使隐藏了托盘图标，也能打开现有后台进程的设置窗口（最多约 2 秒）。关闭设置不会停止提醒。
 
@@ -67,4 +68,4 @@ GitHub Actions 自动执行逻辑测试、Windows 打包、窗体构造烟雾测
 - 天气与假日缓存、服务日志：`%ProgramData%\RainReminder\status\`
 - 个人提醒记录与桌面日志：`%LocalAppData%\RainReminder\`
 
-天气数据：Open-Meteo；地名：GeoNames；假日：日本内阁府。来源和说明见 [data/README.md](data/README.md)。
+天气数据：Open-Meteo；地名：国土地理院 / GeoNames；假日：日本内阁府。来源和说明见 [data/README.md](data/README.md)。
