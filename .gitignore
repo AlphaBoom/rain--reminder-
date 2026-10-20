@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+release/
+dist/
+.vs/
+*.user
+*.suo
+settings.json
+forecast.json
+state.json
+*.log
