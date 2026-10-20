@@ -1,27 +1,39 @@
-param([ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64')
+param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
-    dotnet run --project tests/RainReminder.Tests -c Release
+    dotnet build tests/RainReminder.Tests -c Release --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
+    & ./tests/RainReminder.Tests/bin/Release/net48/RainReminder.Tests.exe
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
-    $output = Join-Path $root "dist/$Runtime"
+    dotnet build src/RainReminder.Service -c Release --nologo -p:DebugType=None
+    if ($LASTEXITCODE -ne 0) { throw 'Service build failed.' }
+    dotnet build src/RainReminder.Tray -c Release --nologo -p:DebugType=None
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed.' }
+    $output = Join-Path $root 'dist/win-x64'
     if (Test-Path $output) { Remove-Item $output -Recurse -Force }
-    dotnet publish src/RainReminder.Service -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "$output/service"
-    if ($LASTEXITCODE -ne 0) { throw 'Service publish failed.' }
-    dotnet publish src/RainReminder.Tray -c Release -r $Runtime --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o "$output/tray"
-    if ($LASTEXITCODE -ne 0) { throw 'Desktop publish failed.' }
-    New-Item -ItemType Directory -Path "$output/scripts" -Force | Out-Null
+    New-Item -ItemType Directory -Path "$output/service","$output/tray","$output/scripts" -Force | Out-Null
+    Copy-Item src/RainReminder.Service/bin/Release/net48/* "$output/service"
+    Copy-Item src/RainReminder.Tray/bin/Release/net48/* "$output/tray"
     Copy-Item scripts/Install.ps1,scripts/Install.cmd,scripts/Uninstall.ps1 "$output/scripts"
     Copy-Item README.md "$output/README.md"
     Copy-Item data/README.md "$output/DATA-SOURCES.md"
-    if ($env:OS -eq 'Windows_NT' -and $Runtime -eq 'win-x64') {
-        & "$output/service/RainReminder.Service.exe" --smoke-test
-        if ($LASTEXITCODE -ne 0) { throw 'Service smoke test failed.' }
-        $smoke = Start-Process "$output/tray/RainReminder.Tray.exe" -ArgumentList '--smoke-test' -Wait -PassThru
-        if ($smoke.ExitCode -ne 0) { throw 'Desktop smoke test failed.' }
+    Copy-Item data/UNICODE-LICENSE.txt "$output/UNICODE-LICENSE.txt"
+    if (Get-ChildItem $output -Recurse -Include coreclr.dll,hostfxr.dll,System.Private.CoreLib.dll,*.runtimeconfig.json) {
+        throw 'Runtime files must not be bundled.'
     }
-    $zip = Join-Path $root "dist/rain-reminder-$Runtime.zip"
+    & "$output/service/RainReminder.Service.exe" --smoke-test
+    if ($LASTEXITCODE -ne 0) { throw 'Service smoke test failed.' }
+    $smoke = Start-Process "$output/tray/RainReminder.Tray.exe" -ArgumentList '--smoke-test' -Wait -PassThru
+    if ($smoke.ExitCode -ne 0) { throw 'Desktop smoke test failed.' }
+    $zip = Join-Path $root 'dist/rain-reminder-win-x64.zip'
     Compress-Archive -Path "$output/*" -DestinationPath $zip -Force
-    Write-Host "Built $zip"
+    $archive = Get-Item $zip
+    if ($archive.Length -gt 1MB) { throw "Package exceeded 1 MiB: $($archive.Length) bytes" }
+    Write-Host ("Built {0} ({1:N0} bytes)" -f $zip, $archive.Length)
+    if ($env:GITHUB_STEP_SUMMARY) {
+        "Windows package: **$($archive.Length) bytes**. Uses Windows 11's built-in .NET Framework 4.8; no extra runtime install." | Out-File $env:GITHUB_STEP_SUMMARY -Append
+    }
 } finally { Pop-Location }
+

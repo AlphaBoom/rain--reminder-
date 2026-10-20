@@ -8,13 +8,16 @@ public static class Policy
     public static string LocalDate(WeatherConfig config, DateTimeOffset now) =>
         TimeZoneInfo.ConvertTime(now, config.Zone).ToString("yyyy-MM-dd");
 
-    public static string ConfigId(WeatherConfig config) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Store.Serialize(config))));
+    public static string ConfigId(WeatherConfig config)
+    {
+        using var hash = SHA256.Create();
+        return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Store.Serialize(config)))).Replace("-", "");
+    }
 
     public static bool IsMorning(WeatherConfig config, DateTimeOffset now)
     {
         var local = TimeZoneInfo.ConvertTime(now, config.Zone);
-        var time = TimeOnly.FromDateTime(local.DateTime);
+        var time = local.TimeOfDay;
         return local.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)
             && time >= config.Start && time < config.End
             && !config.ExcludedDates.Contains(LocalDate(config, now), StringComparer.Ordinal);
@@ -48,9 +51,10 @@ public static class Policy
             var end = DateTimeOffset.FromUnixTimeSeconds(times[i]);
             if (end <= now || end > endOfDay) continue;
             if (probs[i] is not { } p || amounts[i] is not { } mm ||
-                !double.IsFinite(p) || !double.IsFinite(mm) || p is < 0 or > 100 || mm < 0)
+                !Compatibility.IsFinite(p) || !Compatibility.IsFinite(mm) || p is < 0 or > 100 || mm < 0)
                 throw new InvalidDataException("天气数据暂时缺失，稍后重试。");
-            if (!rows.TryAdd(end, (p, mm))) throw new InvalidDataException("天气时间数据重复。");
+            if (rows.ContainsKey(end)) throw new InvalidDataException("天气时间数据重复。");
+            rows.Add(end, (p, mm));
         }
         // Precipitation is the preceding hour's amount. Retain the interval
         // ending at tomorrow 00:00 to cover rain between 23:00 and midnight.

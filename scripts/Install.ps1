@@ -3,8 +3,8 @@ $ErrorActionPreference = 'Stop'
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $admin = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-UserSid', "`"$UserSid`"")
-    exit
+    $elevated = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-UserSid', "`"$UserSid`"")
+    exit $elevated.ExitCode
 }
 # Validate the passed identity rather than accepting arbitrary icacls arguments.
 $sid = New-Object Security.Principal.SecurityIdentifier($UserSid)

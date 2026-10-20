@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Hosting;
 using RainReminder.Core;
 
 namespace RainReminder.Service;
 
-public sealed class WeatherWorker : BackgroundService
+public sealed class WeatherWorker
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public async Task RunAsync(CancellationToken stoppingToken)
     {
         using var http = WeatherClient.CreateHttpClient();
         var client = new WeatherClient(http);
@@ -15,11 +14,10 @@ public sealed class WeatherWorker : BackgroundService
         catch (Exception ex) { Store.Log(Path.Combine(Store.SharedRoot, "status", "service.log"), ex.Message); }
         if (calendar is null)
         {
-            try { calendar = JapanCalendar.Parse(await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "japan-holidays.csv"), stoppingToken), DateTimeOffset.MinValue); }
+            try { calendar = JapanCalendar.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "japan-holidays.csv")), DateTimeOffset.MinValue); }
             catch (Exception ex) { Store.Log(Path.Combine(Store.SharedRoot, "status", "service.log"), ex.Message); }
         }
         var nextCalendarAttempt = DateTimeOffset.MinValue;
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         do
         {
             WeatherConfig? config = null;
@@ -29,7 +27,7 @@ public sealed class WeatherWorker : BackgroundService
                 if (config is null) continue;
                 ServiceStatus? status;
                 try { status = Store.Read<ServiceStatus>(Store.StatusPath); }
-                catch (System.Text.Json.JsonException) { status = null; }
+                catch (ArgumentException) { status = null; }
                 var now = DateTimeOffset.UtcNow;
                 if (!Policy.IsMorning(config, now)) continue;
                 // Refresh weekly. On a network error retain any complete cached
@@ -39,8 +37,8 @@ public sealed class WeatherWorker : BackgroundService
                     nextCalendarAttempt = now.AddMinutes(5);
                     try
                     {
-                        var downloaded = JapanCalendar.Parse(await http.GetByteArrayAsync(JapanCalendar.Source, stoppingToken), now);
-                        if (!downloaded.Covers(int.Parse(Policy.LocalDate(config, now)[..4])))
+                        var downloaded = JapanCalendar.Parse(await client.HolidayBytesAsync(stoppingToken), now);
+                        if (!downloaded.Covers(int.Parse(Policy.LocalDate(config, now).Substring(0, 4))))
                             throw new InvalidDataException("内阁府尚未提供当年完整日历。");
                         Store.Write(calendarPath, downloaded);
                         calendar = downloaded;
@@ -49,7 +47,7 @@ public sealed class WeatherWorker : BackgroundService
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                     catch (Exception ex) { Store.Log(Path.Combine(Store.SharedRoot, "status", "service.log"), "日历更新失败，尝试使用缓存：" + ex.Message); }
                 }
-                if (calendar is null || !calendar.Covers(int.Parse(Policy.LocalDate(config, now)[..4])))
+                if (calendar is null || !calendar.Covers(int.Parse(Policy.LocalDate(config, now).Substring(0, 4))))
                     throw new InvalidDataException("当年日本假日日历不可用，5 分钟后重试。");
                 if (calendar.IsHoliday(Policy.LocalDate(config, now)))
                 {
@@ -79,6 +77,11 @@ public sealed class WeatherWorker : BackgroundService
                     catch (Exception writeError) { Store.Log(Path.Combine(Store.SharedRoot, "status", "service.log"), writeError.Message); }
                 }
             }
-        } while (await timer.WaitForNextTickAsync(stoppingToken));
+        } while (await WaitForNextAsync(stoppingToken));
+    }
+    private static async Task<bool> WaitForNextAsync(CancellationToken token)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(30), token); return true; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { return false; }
     }
 }

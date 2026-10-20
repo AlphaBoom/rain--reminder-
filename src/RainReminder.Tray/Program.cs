@@ -5,7 +5,8 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        ApplicationConfiguration.Initialize();
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
         if (args.Contains("--smoke-test"))
         {
             using var settings = new SettingsForm();

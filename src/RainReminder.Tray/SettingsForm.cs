@@ -1,15 +1,16 @@
 using RainReminder.Core;
+using System.Net.Http;
 
 namespace RainReminder.Tray;
 
 internal sealed class SettingsForm : Form
 {
-    private readonly TextBox query = new() { Dock = DockStyle.Fill, PlaceholderText = "输入城市，例如 Sendai、仙台、Tokyo" };
+    private readonly TextBox query = new() { Dock = DockStyle.Fill };
     private readonly ListBox locations = new() { Dock = DockStyle.Fill, IntegralHeight = false };
     private readonly TextBox start = new() { Text = "06:00", Width = 80 };
     private readonly TextBox end = new() { Text = "10:00", Width = 80 };
     private readonly NumericUpDown probability = new() { Minimum = 1, Maximum = 100, Value = 40, Width = 80 };
-    private readonly TextBox exclusions = new() { Dock = DockStyle.Fill, PlaceholderText = "例如 2026-11-03,2026-11-23" };
+    private readonly TextBox exclusions = new() { Dock = DockStyle.Fill };
     private readonly Label status = new() { Dock = DockStyle.Fill, AutoSize = false };
     private readonly Button search = new() { Text = "搜索地点", AutoSize = true };
     private readonly CheckBox showIcon = new() { Text = "在通知区域显示托盘图标", AutoSize = true, Checked = false };
@@ -107,7 +108,7 @@ internal sealed class SettingsForm : Form
                 Name = location.Name, Latitude = location.Latitude, Longitude = location.Longitude,
                 TimeZone = location.TimeZone, MorningStart = start.Text.Trim(), MorningEnd = end.Text.Trim(),
                 ProbabilityThreshold = (int)probability.Value, PrecipitationThreshold = previous?.PrecipitationThreshold ?? 0.1,
-                ExcludedDates = exclusions.Text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                ExcludedDates = exclusions.Text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray(),
                 ShowTrayIcon = showIcon.Checked,
             }.Validate();
             Store.Write(Store.ConfigPath, config);

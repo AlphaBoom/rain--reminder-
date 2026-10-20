@@ -15,18 +15,18 @@ public static class JapanCalendar
 
     public static HolidayCache Parse(byte[] csv, DateTimeOffset updatedAt)
     {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        
         var text = Encoding.GetEncoding(932).GetString(csv);
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var dates = new HashSet<string>(StringComparer.Ordinal);
         foreach (var line in lines.Skip(1))
         {
-            var fields = line.Trim().Split(',', 2);
-            if (fields.Length != 2 || !DateOnly.TryParseExact(fields[0].Trim('"'), "yyyy/M/d", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            var fields = line.Trim().Split(new[] { ',' }, 2);
+            if (fields.Length != 2 || !DateTime.TryParseExact(fields[0].Trim('"'), "yyyy/M/d", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                 throw new InvalidDataException("内阁府假日 CSV 格式无效。");
             dates.Add(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         }
         if (dates.Count < 16) throw new InvalidDataException("假日日历数据不完整。");
-        return new HolidayCache(updatedAt, dates.Order(StringComparer.Ordinal).ToArray());
+        return new HolidayCache(updatedAt, dates.OrderBy(x => x, StringComparer.Ordinal).ToArray());
     }
 }

@@ -1,6 +1,6 @@
 # Rain Reminder · 早晨降雨提醒
 
-Windows 11 上常驻的 C#/.NET 10 应用。在工作日早餐时段，若今天剩余时间有降水风险，就弹出一次“记得查看天气、考虑带伞”的提醒。
+Windows 11 上常驻的 C#/.NET Framework 4.8 应用。在工作日早餐时段，若今天剩余时间有降水风险，就弹出一次“记得查看天气、考虑带伞”的提醒。
 
 - 真正的 Windows 服务 `RainReminder`，随系统自动启动；无需保持应用窗口开启。
 - 桌面提醒进程随用户登录启动，**托盘图标默认隐藏**，可以在设置里打开。
@@ -9,9 +9,11 @@ Windows 11 上常驻的 C#/.NET 10 应用。在工作日早餐时段，若今天
 - 默认：任一剩余小时降水概率 ≥ 40%，**或**降水量 ≥ 0.1 mm 时提醒。降水包含雨、阵雨和雪。
 - 无雨不打扰；每人每天最多一次。解锁后才弹窗，错过早晨时段不会在下午补弹。
 - 无雨时每 30 分钟更新一次；天气网络错误 5 分钟后重试。休眠时不唤醒电脑，恢复后继续检查。
-- 不需要 API Key，不依赖 Python。Windows 安装包自带 .NET 运行时。
+- 不需要 API Key，不依赖 Python。直接使用 Windows 11 自带的 .NET Framework 4.8/4.8.1；无需另装 .NET、Python 或 VC++ 运行库。
 
 ## 安装
+
+此版本不再捆绑运行时，安装包设有 **1 MiB** 的体积上限。Windows 11 已包含兼容的 .NET Framework 4.8 或 4.8.1，不需要额外下载。注册系统服务时仍需一次管理员权限。
 
 1. 下载 Windows 构建产物 `rain-reminder-win-x64.zip` 并完整解压。
 2. 双击 `scripts/Install.cmd`，接受 Windows 管理员权限提示以注册系统服务。
@@ -42,18 +44,19 @@ Windows 系统服务运行在 Session 0，不能直接向登录用户显示交�
 
 ## 源码构建
 
-需要 .NET 10 SDK。Windows 上运行：
+构建源码时需要 .NET 10 SDK（仅开发和编译使用，**用户电脑不需要安装它**）。产物目标是 .NET Framework 4.8，使用系统内置 ServiceBase、WinForms、HTTP 和 JSON 组件，无第三方运行时依赖。Windows 上运行：
 
 ```powershell
 ./scripts/Build.ps1
 ```
 
-输出 `dist/rain-reminder-win-x64.zip`。也可传入 `-Runtime win-arm64` 构建 ARM64（ARM64 未在 x64 构建机上执行桌面烟雾测试）。
+输出 `dist/rain-reminder-win-x64.zip`。两个程序共用 Windows 自带框架；压缩包超过 1 MiB 会使构建失败。当前打包验证对象为 Windows 11 x64。
 
-核心逻辑测试可以跨平台运行，无额外测试库：
+核心逻辑测试使用真实 .NET Framework CLR，在 Windows 上执行，无额外测试库：
 
 ```sh
-dotnet run --project tests/RainReminder.Tests -c Release
+dotnet build tests/RainReminder.Tests -c Release
+./tests/RainReminder.Tests/bin/Release/net48/RainReminder.Tests.exe
 ```
 
 GitHub Actions 自动执行逻辑测试、Windows 打包、窗体构造烟雾测试，以及临时构建机上的服务安装卸载检查，并上传安装包。该 CI 不会自动将服务安装到你的电脑，也不代替真实 Windows 11 的登录、锁屏和休眠验收。

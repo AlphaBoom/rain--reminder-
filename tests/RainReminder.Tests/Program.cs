@@ -1,4 +1,5 @@
 using RainReminder.Core;
+using System.Net.Http;
 
 var count = 0;
 void Test(string name, Action action)
@@ -96,11 +97,47 @@ Test("holiday blocks even a rainy status", () => {
     var s = Status(Policy.Analyze(Forecast(18, 80), config, now)) with { IsHoliday = true };
     Assert(!Policy.ShouldNotify(config, s, new UserState(), now));
 });
-Test("invalid holiday CSV rejected", () => Throws(() => JapanCalendar.Parse("<html>outage</html>"u8.ToArray(), now)));
+Test("invalid holiday CSV rejected", () => Throws(() => JapanCalendar.Parse(System.Text.Encoding.UTF8.GetBytes("<html>outage</html>"), now)));
 Test("atomic JSON round trip", () => {
     var path = Path.Combine(Path.GetTempPath(), "rain-test-" + Guid.NewGuid().ToString("N"), "config.json");
     try { Store.Write(path, config); Assert(Store.Read<WeatherConfig>(path)?.Name == config.Name); }
     finally { Directory.Delete(Path.GetDirectoryName(path)!, true); }
+});
+Test("uses Windows built-in Framework CLR", () => Assert(typeof(object).Assembly.GetName().Name == "mscorlib" && Environment.Version.Major == 4));
+Test("IANA Japan timezone resolves on Windows", () => Assert(Compatibility.FindZone("Asia/Tokyo").BaseUtcOffset == TimeSpan.FromHours(9)));
+Test("cache and status JSON retain ISO timestamps", () => {
+    var directory = Path.Combine(Path.GetTempPath(), "rain-state-" + Guid.NewGuid().ToString("N"));
+    var path = Path.Combine(directory, "state.json");
+    try
+    {
+        var status = Status(Policy.Analyze(Forecast(18, 80), config, now));
+        Store.Write(path, status);
+        Assert(Store.Read<ServiceStatus>(path) == status);
+        var calendar = new HolidayCache(now, ["2026-11-03", "2026-11-23"]);
+        Store.Write(path, calendar);
+        var copy = Store.Read<HolidayCache>(path)!;
+        Assert(copy.UpdatedAt == now && copy.Dates.SequenceEqual(calendar.Dates));
+        Store.Write(path, new UserState("2026-10-20"));
+        Assert(Store.Read<UserState>(path)?.NotifiedDate == "2026-10-20");
+    }
+    finally { Directory.Delete(directory, true); }
+});
+Test("old settings remain compatible", () => {
+    var path = Path.Combine(Path.GetTempPath(), "rain-old-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        File.WriteAllText(path, "{\"name\":\"Sendai\",\"latitude\":38.27,\"longitude\":140.87,\"timeZone\":\"Asia/Tokyo\",\"morningStart\":\"06:00\",\"morningEnd\":\"10:00\",\"probabilityThreshold\":40,\"precipitationThreshold\":0.1,\"excludedDates\":[],\"showTrayIcon\":false}");
+        Assert(Store.Read<WeatherConfig>(path)!.Validate().Name == "Sendai");
+    }
+    finally { File.Delete(path); }
+});
+Test("built-in JSON parser reads forecast and geocoding API shapes", () => {
+    using var http = new HttpClient(new FixtureHandler());
+    var client = new WeatherClient(http);
+    var matches = client.SearchAsync("Sendai", CancellationToken.None).GetAwaiter().GetResult();
+    Assert(matches.Length == 1 && matches[0].TimeZone == "Asia/Tokyo");
+    var result = client.ForecastAsync(config, CancellationToken.None).GetAwaiter().GetResult();
+    Assert(result.Hourly!.Time!.Length == 2 && result.Hourly.Probability![0] == 40 && result.Hourly.Precipitation![1] is null);
 });
 Console.WriteLine($"{count} tests passed.");
 if (args.Contains("--live"))
@@ -112,4 +149,15 @@ if (args.Contains("--live"))
     var forecast = await client.ForecastAsync(config, CancellationToken.None);
     Assert(forecast.Hourly?.Time?.Length >= 48);
     Console.WriteLine($"Live API contract passed: {matches.Length} location(s), {forecast.Hourly!.Time!.Length} forecast hours.");
+}
+
+sealed class FixtureHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        var json = request.RequestUri!.Host.StartsWith("geocoding", StringComparison.Ordinal)
+            ? "{\"results\":[{\"name\":\"Sendai\",\"latitude\":38.27,\"longitude\":140.87,\"timezone\":\"Asia/Tokyo\",\"country\":\"Japan\",\"admin1\":\"Miyagi\"}]}"
+            : "{\"hourly\":{\"time\":[1792454400,1792458000],\"precipitation_probability\":[40,null],\"precipitation\":[0.1,null]}}";
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(json) });
+    }
 }

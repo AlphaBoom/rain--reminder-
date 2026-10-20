@@ -1,11 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
     <AssemblyName>RainReminder.Service</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../RainReminder.Core/RainReminder.Core.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="../../data/japan-holidays.csv" Link="japan-holidays.csv" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

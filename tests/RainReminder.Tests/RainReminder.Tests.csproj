@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/RainReminder.Core/RainReminder.Core.csproj" /></ItemGroup>
+  <ItemGroup><Reference Include="System.Net.Http" /></ItemGroup>
   <ItemGroup><Content Include="../../data/japan-holidays.csv" Link="japan-holidays.csv" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

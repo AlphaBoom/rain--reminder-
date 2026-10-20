@@ -7,3 +7,5 @@
 
 天气来自 Open-Meteo：https://open-meteo.com/ ，地名搜索来自 Open-Meteo Geocoding / GeoNames：https://www.geonames.org/ 。
 天气数据按 CC BY 4.0 使用并署名，非商业免费 API 的使用范围以 Open-Meteo 当前条款为准。程序仅向对应服务发送地名搜索词、所选经纬度和时区，不上传个人设置文件。
+
+时区映射使用 Unicode CLDR 的 `windowsZones.xml`，用于将天气 API 的 IANA 时区对应到 Windows 时区；来源：https://github.com/unicode-org/cldr/blob/main/common/supplemental/windowsZones.xml 。该数据编入核心 DLL，许可见 `UNICODE-LICENSE.txt`。

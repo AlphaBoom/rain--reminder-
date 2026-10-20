@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>RainReminder.Tray</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../RainReminder.Core/RainReminder.Core.csproj" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Drawing" />
   </ItemGroup>
 </Project>
